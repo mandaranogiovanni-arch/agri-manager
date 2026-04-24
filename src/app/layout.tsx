@@ -17,6 +17,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#16a34a" />
+      </head>
       <body className="bg-gray-50 text-gray-900">
         <AuthGate>
         <header className="bg-white border-b shadow-sm">

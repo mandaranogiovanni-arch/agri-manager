@@ -6,6 +6,8 @@ import AuthGate from './AuthGate'
 export const metadata: Metadata = {
   title: 'Agri Manager',
   description: 'Gestionale agricolo',
+  manifest: '/manifest.json',
+  themeColor: '#16a34a',
 }
 
 export default function RootLayout({

@@ -8,6 +8,7 @@ type Product = {
   name: string
   category: string
   unit: string
+  min_stock?: number | null
 }
 
 type Harvest = {
@@ -34,6 +35,8 @@ type ProductStockRow = {
   sold: number
   adjusted: number
   available: number
+  min_stock: number
+status: 'ok' | 'low' | 'empty'
 }
 
 export default function MagazzinoPage() {
@@ -53,7 +56,7 @@ export default function MagazzinoPage() {
     setMessage('')
 
     const [productsRes, harvestsRes, itemsRes, adjustmentsRes] = await Promise.all([
-      supabase.from('products').select('id, name, category, unit').order('name'),
+      supabase.from('products').select('id, name, category, unit, min_stock').order('name'),
       supabase.from('harvests').select('product_id, quantity'),
       supabase.from('order_items').select('product_id, quantity'),
       supabase.from('stock_adjustments').select('product_id, quantity'),
@@ -104,6 +107,17 @@ export default function MagazzinoPage() {
         .filter((adj) => adj.product_id === product.id)
         .reduce((sum, adj) => sum + Number(adj.quantity || 0), 0)
 
+        const minStock = Number(product.min_stock || 0)
+        const available = harvested - sold - adjusted
+
+        let status: 'ok' | 'low' | 'empty' = 'ok'
+
+        if (available <= 0) {
+          status = 'empty'
+        } else if (minStock > 0 && available <= minStock) {
+          status = 'low'
+        }
+
       return {
         id: product.id,
         name: product.name,
@@ -112,7 +126,9 @@ export default function MagazzinoPage() {
         harvested,
         sold,
         adjusted,
-        available: harvested - sold - adjusted,
+        min_stock: minStock,
+        available,
+        status,
       }
     })
   }, [products, harvests, orderItems, adjustments])
@@ -130,11 +146,32 @@ export default function MagazzinoPage() {
       ) : (
         <div className="space-y-4">
           {stockRows.map((row) => (
-            <div key={row.id} className="bg-white border rounded-2xl p-4">
+            <div
+              key={row.id}
+              className={`bg-white border rounded-2xl p-4 ${
+                row.status === 'empty'
+                  ? 'border-red-500 bg-red-50'
+                  : row.status === 'low'
+                  ? 'border-orange-500 bg-orange-50'
+                  : ''
+              }`}
+            >
               <div className="text-xl font-semibold">{row.name}</div>
               <div className="text-sm text-gray-600 mb-3">
                 Categoria: {row.category} • Unità: {row.unit}
               </div>
+
+              {row.status === 'empty' && (
+                <div className="mt-2 mb-3 text-sm font-semibold text-red-600">
+                  Esaurito / disponibilità zero
+                </div>
+              )}
+
+              {row.status === 'low' && (
+                <div className="mt-2 mb-3 text-sm font-semibold text-orange-600">
+                  Sotto scorta minima
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="border rounded-xl p-3 bg-gray-50">

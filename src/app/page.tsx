@@ -3,6 +3,17 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts'
 
 type EggRow = {
   production_date: string
@@ -59,7 +70,15 @@ type DashboardStats = {
   topHarvestedProduct: string
 }
 
+type ChartPoint = {
+  date: string
+  ricavi: number
+  spese: number
+  uova: number
+}
+
 export default function Home() {
+  const [chartData, setChartData] = useState<ChartPoint[]>([])
   const [stats, setStats] = useState<DashboardStats>({
     eggsToday: 0,
     brokenToday: 0,
@@ -171,6 +190,33 @@ export default function Home() {
     const topSold = [...productStats].sort((a, b) => b.sold - a.sold)[0]
     const topHarvested = [...productStats].sort((a, b) => b.harvested - a.harvested)[0]
 
+    const last7Days = Array.from({ length: 7 }).map((_, index) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - index))
+      return d.toISOString().split('T')[0]
+    })
+
+    const chartRows = last7Days.map((date) => {
+      const dayOrders = orderRows.filter((order) => order.order_date === date)
+      const dayExpenses = expenseRows.filter((expense) => expense.expense_date === date)
+      const dayEggs = eggRows.filter((egg) => egg.production_date === date)
+
+      return {
+        date: new Date(date).toLocaleDateString('it-IT', {
+          day: '2-digit',
+          month: '2-digit',
+        }),
+        ricavi: dayOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+        spese: dayExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0),
+        uova: dayEggs.reduce(
+          (sum, egg) => sum + Number(egg.quantity || 0) - Number(egg.broken || 0),
+          0
+        ),
+      }
+    })
+
+    setChartData(chartRows)
+
     setStats({
       eggsToday,
       brokenToday,
@@ -250,6 +296,45 @@ export default function Home() {
           <Card title="Disponibilità teorica" value={stats.totalAvailableStock} />
           <Card title="Prodotto più venduto" value={stats.topSoldProduct} />
           <Card title="Prodotto più raccolto" value={stats.topHarvestedProduct} />
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold mb-3">📊 Andamento ultimi 7 giorni</h2>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="bg-white border rounded-2xl p-5">
+            <h3 className="font-semibold mb-4">Ricavi e spese</h3>
+
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="ricavi" name="Ricavi" />
+                  <Bar dataKey="spese" name="Spese" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-5">
+            <h3 className="font-semibold mb-4">Uova buone prodotte</h3>
+
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="uova" name="Uova buone" strokeWidth={3} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </section>
 

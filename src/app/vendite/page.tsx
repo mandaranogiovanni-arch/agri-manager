@@ -488,8 +488,10 @@ function getFriendlyErrorMessage(error: any) {
 
     if (!validateForm()) return
 
-    const hasAvailability = await checkAvailabilityForLines()
-    if (!hasAvailability) return
+    if (orderStatus === 'vendita') {
+      const hasAvailability = await checkAvailabilityForLines()
+      if (!hasAvailability) return
+    }
 
     const validLines = lines.filter(
       (line) =>
@@ -539,8 +541,10 @@ function getFriendlyErrorMessage(error: any) {
     if (!editingOrderId) return
     if (!validateForm()) return
 
-    const hasAvailability = await checkAvailabilityForLines()
-    if (!hasAvailability) return
+    if (orderStatus === 'vendita') {
+      const hasAvailability = await checkAvailabilityForLines()
+      if (!hasAvailability) return
+    }
 
     const validLines = lines.filter(
       (line) =>
@@ -610,14 +614,37 @@ function getFriendlyErrorMessage(error: any) {
   ) {
     setMessage('')
 
-    const { error } = await supabase
-      .from('orders')
-      .update({ fulfillment_status: newStatus })
-      .eq('id', orderId)
+    if (newStatus === 'consegnato') {
+      const orderToCheck = orders.find((order) => order.id === orderId)
+
+      if (orderToCheck) {
+        const itemsToCheck = orderItems.filter((item) => item.order_id === orderId)
+
+        for (const item of itemsToCheck) {
+          const product = products.find((p) => p.id === item.product_id)
+
+          if (!product) continue
+
+          const available = availabilityMap[item.product_id || ''] ?? 0
+
+          if (Number(item.quantity) > available) {
+            setMessage(
+              `Non puoi consegnare: disponibilità insufficiente per ${product.name}. Disponibile: ${available} ${product.unit}, richiesto: ${item.quantity} ${product.unit}`
+            )
+            return
+          }
+        }
+      }
+    }
+
+    const { error } = await supabase.rpc('update_order_status_safe', {
+      p_order_id: orderId,
+      p_new_status: newStatus,
+    })
 
     if (error) {
       console.error(error)
-      setMessage('Errore aggiornamento stato ordine ❌')
+      setMessage(getFriendlyErrorMessage(error))
       return
     }
 
@@ -630,6 +657,7 @@ function getFriendlyErrorMessage(error: any) {
     )
 
     setMessage('Stato ordine aggiornato ✅')
+    loadAvailability()
   }
 
   async function updateOrderPaidStatus(orderId: string, newPaidValue: boolean) {

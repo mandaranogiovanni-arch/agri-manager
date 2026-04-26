@@ -9,6 +9,7 @@ type Product = {
   category: string
   unit: string
   base_price: number | null
+  min_stock: number | null
 }
 
 export default function ProdottiPage() {
@@ -22,6 +23,7 @@ export default function ProdottiPage() {
   const [category, setCategory] = useState('ortaggi')
   const [unit, setUnit] = useState('kg')
   const [basePrice, setBasePrice] = useState('')
+  const [minStock, setMinStock] = useState('')
 
   useEffect(() => {
     loadProducts()
@@ -33,7 +35,7 @@ export default function ProdottiPage() {
 
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, category, unit, base_price')
+      .select('id, name, category, unit, base_price, min_stock')
       .order('name')
 
     if (error) {
@@ -52,6 +54,7 @@ export default function ProdottiPage() {
     setCategory('ortaggi')
     setUnit('kg')
     setBasePrice('')
+    setMinStock('')
   }
 
   async function saveProduct() {
@@ -67,6 +70,7 @@ export default function ProdottiPage() {
       category,
       unit,
       base_price: basePrice ? Number(basePrice) : 0,
+      min_stock: minStock ? Number(minStock) : 0,
     }
 
     if (editingProductId) {
@@ -103,11 +107,20 @@ export default function ProdottiPage() {
     setName(product.name)
     setCategory(product.category)
     setUnit(product.unit)
+
     setBasePrice(
       product.base_price !== null && product.base_price !== undefined
         ? String(product.base_price)
         : ''
     )
+
+    // 👇 AGGIUNGI QUESTO QUI
+    setMinStock(
+      product.min_stock !== null && product.min_stock !== undefined
+        ? String(product.min_stock)
+        : ''
+    )
+
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -195,6 +208,18 @@ export default function ProdottiPage() {
           </div>
 
           <div>
+            <label className="block text-sm mb-1">Soglia minima magazzino</label>
+            <input
+              type="number"
+              step="0.01"
+              value={minStock}
+              onChange={(e) => setMinStock(e.target.value)}
+              placeholder="Es. 5"
+              className="w-full border rounded p-2"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm mb-1">Prezzo base (€)</label>
             <input
               type="number"
@@ -237,6 +262,10 @@ export default function ProdottiPage() {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
+                </div>
+
+                <div>
+                  Soglia minima: {Number(product.min_stock || 0)} {product.unit}
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-3">

@@ -99,10 +99,17 @@ export default function RootLayout({
               >
                 Clienti
               </Link>
+
+              <Link 
+                href="/galline"
+                className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 transition"
+              >
+                Galline
+              </Link>
             </nav>
           </div>
         </header>
-
+        
         <main>{children}</main>
         </AuthGate>
       </body>

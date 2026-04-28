@@ -39,6 +39,7 @@ type Product = {
   name: string
   category: string
   unit: string
+  min_stock?: number | null
 }
 
 type Harvest = {
@@ -68,6 +69,7 @@ type DashboardStats = {
   totalAvailableStock: number
   topSoldProduct: string
   topHarvestedProduct: string
+  lowStockCount: number
 }
 
 type ChartPoint = {
@@ -96,6 +98,7 @@ export default function Home() {
     totalAvailableStock: 0,
     topSoldProduct: '-',
     topHarvestedProduct: '-',
+    lowStockCount: 0
   })
 
   useEffect(() => {
@@ -117,7 +120,7 @@ export default function Home() {
       supabase.from('egg_production').select('production_date, quantity, broken'),
       supabase.from('orders').select('id, order_date, total, paid, fulfillment_status'),
       supabase.from('expenses').select('amount, expense_date'),
-      supabase.from('products').select('id, name, category, unit'),
+      supabase.from('products').select('id, name, category, unit, min_stock'),
       supabase.from('harvests').select('product_id, quantity'),
       supabase.from('order_items').select('product_id, quantity'),
       supabase.from('stock_adjustments').select('product_id, quantity'),
@@ -184,6 +187,9 @@ export default function Home() {
     })
 
     const totalHarvested = productStats.reduce((sum, p) => sum + p.harvested, 0)
+    const lowStockCount = productStats.filter(
+      (p) => p.available <= (p.min_stock || 0)
+   ).length
     const totalAvailableStock = productStats.reduce((sum, p) => sum + p.available, 0)
     const availableProductsCount = productStats.filter((p) => p.available > 0).length
 
@@ -232,6 +238,7 @@ export default function Home() {
       totalHarvested,
       availableProductsCount,
       totalAvailableStock,
+      lowStockCount,
       topSoldProduct: topSold && topSold.sold > 0 ? topSold.name : '-',
       topHarvestedProduct:
         topHarvested && topHarvested.harvested > 0 ? topHarvested.name : '-',
@@ -372,9 +379,23 @@ export default function Home() {
           <div className="text-gray-600">Gestisci clienti e storico.</div>
         </Link>
 
-        <Link href="/magazzino" className="bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md">
+        <Link
+          href="/magazzino"
+          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md ${
+            stats.lowStockCount > 0 ? 'border-red-500 bg-red-50' : ''
+          }`}
+        >
           <div className="text-xl font-semibold mb-2">Magazzino 📦</div>
-          <div className="text-gray-600">Controlla disponibilità.</div>
+
+          <div className="text-gray-600">
+            Prodotti sotto soglia: {stats.lowStockCount}
+          </div>
+
+          {stats.lowStockCount > 0 && (
+            <div className="text-sm text-red-600 mt-2 font-semibold">
+              ⚠️ Attenzione: prodotti quasi finiti
+            </div>
+          )}
         </Link>
       </div>
     </div>

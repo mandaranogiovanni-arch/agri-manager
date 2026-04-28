@@ -189,11 +189,11 @@ export default function VenditePage() {
     setPickupTime('')
     setOrderNotes('')
     setFulfillmentStatus('da_evadere')
-    setLines([{ productId: '', quantity: '', price: '' }])
+    setLines([{ productId: '', quantity: '1', price: '' }])
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { productId: '', quantity: '', price: '' }])
+    setLines((prev) => [...prev, { productId: '', quantity: '1', price: '' }])
   }
 
   function removeLine(index: number) {
@@ -602,7 +602,7 @@ function getFriendlyErrorMessage(error: any) {
             quantity: String(item.quantity),
             price: String(item.price),
           }))
-        : [{ productId: '', quantity: '', price: '' }]
+        : [{ productId: '', quantity: '1', price: '' }]
     )
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -919,7 +919,16 @@ function getFriendlyErrorMessage(error: any) {
                 <label className="block text-sm mb-1">Prodotto</label>
                 <select
                   value={line.productId}
-                  onChange={(e) => updateLine(index, 'productId', e.target.value)}
+                  onChange={(e) => {
+                    const productId = e.target.value
+                    updateLine(index, 'productId', productId)
+
+                    const product = products.find(p => p.id === productId)
+
+                    if (product) {
+                      updateLine(index, 'price', String(product.base_price || 0))
+                    }
+                  }}
                   className="w-full border rounded p-2"
                 >
                   <option value="">Seleziona prodotto</option>
@@ -982,6 +991,36 @@ function getFriendlyErrorMessage(error: any) {
                         : 'border-gray-300'
                     }`}
                   />
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateLine(
+                        index,
+                        'quantity',
+                        String(Math.max(1, Number(line.quantity || 0) - 1))
+                      )
+                    }
+                    className="px-3 py-1 border rounded"
+                  >
+                    -
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateLine(
+                        index,
+                        'quantity',
+                        String(Number(line.quantity || 0) + 1)
+                      )
+                    }
+                    className="px-3 py-1 border rounded"
+                  >
+                    +
+                  </button>
                 </div>
 
                 <div>

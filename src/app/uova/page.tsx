@@ -8,15 +8,20 @@ type EggRow = {
   production_date: string
   quantity: number
   broken: number
+  batch_number?: string | null
   created_at?: string
 }
 
 export default function UovaPage() {
   const [quantity, setQuantity] = useState('')
   const [broken, setBroken] = useState('')
+  const [productionDate, setProductionDate] = useState(
+    new Date().toISOString().split('T')[0]
+  )
   const [message, setMessage] = useState('')
   const [rows, setRows] = useState<EggRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadEggProduction()
@@ -57,23 +62,74 @@ export default function UovaPage() {
       return
     }
 
-    const { error } = await supabase.from('egg_production').insert([
-      {
-        production_date: new Date().toISOString().split('T')[0],
-        quantity: qty,
-        broken: brk,
-      },
-    ])
+    if (editingId) {
+      // 🔄 UPDATE
+      const { error } = await supabase
+        .from('egg_production')
+        .update({
+          production_date: productionDate,
+          quantity: qty,
+          broken: brk,
+        })
+        .eq('id', editingId)
+
+      if (error) {
+        console.error(error)
+        setMessage('Errore aggiornamento ❌')
+        return
+      }
+
+      setMessage('Modificato con successo ✅')
+      setEditingId(null)
+    } else {
+      // ➕ INSERT
+      const { error } = await supabase.from('egg_production').insert([
+        {
+          production_date: productionDate,
+          quantity: qty,
+          broken: brk,
+        },
+      ])
+
+      if (error) {
+        console.error(error)
+        setMessage('Errore salvataggio ❌')
+        return
+      }
+
+      setMessage('Salvato con successo ✅')
+    }
+
+    setQuantity('')
+    setBroken('')
+    loadEggProduction()
+    setProductionDate(new Date().toISOString().split('T')[0])
+  }
+
+  function startEdit(row: EggRow) {
+    setEditingId(row.id)
+    setProductionDate(row.production_date)
+    setQuantity(String(row.quantity))
+    setBroken(String(row.broken))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function deleteRow(id: string) {
+    const conferma = window.confirm('Vuoi eliminare questo record?')
+    if (!conferma) return
+
+    const { error } = await supabase
+      .from('egg_production')
+      .delete()
+      .eq('id', id)
 
     if (error) {
       console.error(error)
-      setMessage('Errore salvataggio ❌')
+      setMessage('Errore eliminazione ❌')
       return
     }
 
-    setMessage('Salvato con successo ✅')
-    setQuantity('')
-    setBroken('')
+    setMessage('Eliminato ✅')
     loadEggProduction()
   }
 
@@ -82,6 +138,13 @@ export default function UovaPage() {
       <h1 className="text-2xl font-bold mb-4">Produzione Uova 🥚</h1>
 
       <div className="border rounded-xl p-4 mb-6 space-y-3 bg-white">
+        <input
+          type="date"
+          value={productionDate}
+          onChange={(e) => setProductionDate(e.target.value)}
+          className="w-full border p-2 rounded"
+        />
+
         <input
           type="number"
           placeholder="Numero uova"
@@ -102,7 +165,7 @@ export default function UovaPage() {
           onClick={saveEggs}
           className="w-full bg-green-600 text-white p-2 rounded"
         >
-          Salva
+          {editingId ? 'Aggiorna' : 'Salva'}
         </button>
 
         {message && <p className="text-center text-sm">{message}</p>}
@@ -123,9 +186,27 @@ export default function UovaPage() {
                   Data:{' '}
                   {new Date(row.production_date).toLocaleDateString('it-IT')}
                 </div>
+                
+                <div>Lotto: {row.batch_number || '-'}</div>
                 <div>Uova: {row.quantity}</div>
                 <div>Rotte: {row.broken}</div>
                 <div>Buone: {row.quantity - row.broken}</div>
+
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => startEdit(row)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded"
+                  >
+                    Modifica
+                  </button>
+
+                  <button
+                    onClick={() => deleteRow(row.id)}
+                    className="bg-red-600 text-white px-3 py-1 rounded"
+                  >
+                    Elimina
+                  </button>
+                </div>
               </div>
             ))}
           </div>

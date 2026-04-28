@@ -43,7 +43,11 @@ export default function ColtivazioniPage() {
     setMessage('')
 
     const [productsRes, cropsRes] = await Promise.all([
-      supabase.from('products').select('id, name, category, unit').order('name'),
+      supabase
+        .from('products')
+        .select('id, name, category, unit')
+        .neq('category', 'uova')
+        .order('name'),
       supabase.from('crops').select('*').order('planted_at', { ascending: false }),
     ])
 

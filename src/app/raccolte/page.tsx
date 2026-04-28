@@ -41,7 +41,11 @@ export default function RaccoltePage() {
     setMessage('')
 
     const [productsRes, harvestsRes] = await Promise.all([
-      supabase.from('products').select('id, name, category, unit').order('name'),
+      supabase
+        .from('products')
+        .select('id, name, category, unit')
+        .neq('category', 'uova')
+        .order('name'),
       supabase
         .from('harvests')
         .select('*')

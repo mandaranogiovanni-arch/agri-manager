@@ -39,6 +39,11 @@ type ProductStockRow = {
 status: 'ok' | 'low' | 'empty'
 }
 
+type EggProduction = {
+  quantity: number
+  broken: number
+}
+
 export default function MagazzinoPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [harvests, setHarvests] = useState<Harvest[]>([])
@@ -46,6 +51,7 @@ export default function MagazzinoPage() {
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
+  const [eggs, setEggs] = useState<EggProduction[]>([])
 
   useEffect(() => {
     loadAll()
@@ -55,11 +61,12 @@ export default function MagazzinoPage() {
     setLoading(true)
     setMessage('')
 
-    const [productsRes, harvestsRes, itemsRes, adjustmentsRes] = await Promise.all([
+    const [productsRes, harvestsRes, itemsRes, adjustmentsRes, eggsRes] = await Promise.all([
       supabase.from('products').select('id, name, category, unit, min_stock').order('name'),
       supabase.from('harvests').select('product_id, quantity'),
       supabase.from('order_items').select('product_id, quantity'),
       supabase.from('stock_adjustments').select('product_id, quantity'),
+      supabase.from('egg_production').select('quantity, broken'),
     ])
 
     if (productsRes.error) {
@@ -90,14 +97,29 @@ export default function MagazzinoPage() {
       setAdjustments(adjustmentsRes.data || [])
     }
 
+    if (eggsRes.error) {
+      console.error(eggsRes.error)
+      setMessage('Errore caricamento uova ❌')
+    } else {
+      setEggs(eggsRes.data || [])
+    }
+
     setLoading(false)
   }
 
   const stockRows = useMemo<ProductStockRow[]>(() => {
     return products.map((product) => {
-      const harvested = harvests
-        .filter((h) => h.product_id === product.id)
-        .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
+      const eggsAvailable = eggs.reduce(
+        (sum, egg) => sum + Number(egg.quantity || 0) - Number(egg.broken || 0),
+        0
+      )
+
+      const harvested =
+        product.category === 'uova'
+          ? eggsAvailable
+          : harvests
+              .filter((h) => h.product_id === product.id)
+              .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
 
       const sold = orderItems
         .filter((item) => item.product_id === product.id)
@@ -131,7 +153,7 @@ export default function MagazzinoPage() {
         status,
       }
     })
-  }, [products, harvests, orderItems, adjustments])
+  }, [products, harvests, orderItems, adjustments, eggs])
 
   return (
     <main className="p-6 max-w-6xl mx-auto">

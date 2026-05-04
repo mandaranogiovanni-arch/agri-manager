@@ -165,9 +165,17 @@ export default function Home() {
     const unpaidOrders = orderRows.filter((row) => !row.paid).length
 
     const productStats = products.map((product) => {
-      const harvested = harvests
-        .filter((h) => h.product_id === product.id)
-        .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
+      const eggsAvailable = eggRows.reduce(
+        (sum, egg) => sum + Number(egg.quantity || 0) - Number(egg.broken || 0),
+        0
+      )
+
+      const harvested =
+        product.category === 'uova'
+          ? eggsAvailable
+          : harvests
+              .filter((h) => h.product_id === product.id)
+              .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
 
       const sold = orderItems
         .filter((i) => i.product_id === product.id)

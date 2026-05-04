@@ -250,7 +250,7 @@ function hasAvailabilityErrors() {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchType =
-        filterType === 'tutti' ? true : (order.status || 'vendita') === filterType
+        filterType === 'tutti' ? true : (order.status || 'vendita') === filterType     
 
       const matchFulfillment =
         filterFulfillment === 'tutti'
@@ -278,6 +278,29 @@ function hasAvailabilityErrors() {
       )
     })
   }, [orders, filterType, filterFulfillment, filterPayment, filterCustomer, filterDate])
+
+  const unpaidByCustomer = useMemo(() => {
+    return customers
+      .map((customer) => {
+        const unpaidOrders = orders.filter(
+          (order) => order.customer_id === customer.id && !order.paid
+        )
+
+        const totalUnpaid = unpaidOrders.reduce(
+          (sum, order) => sum + Number(order.total || 0),
+          0
+        )
+
+        return {
+          customerId: customer.id,
+          customerName: customer.name,
+          orders: unpaidOrders,
+          count: unpaidOrders.length,
+          total: totalUnpaid,
+        }
+      })
+      .filter((group) => group.count > 0)
+  }, [customers, orders]) 
 
   async function createNewCustomer() {
     setMessage('')
@@ -681,6 +704,46 @@ function getFriendlyErrorMessage(error: any) {
     )
 
     setMessage('Stato pagamento aggiornato ✅')
+  }
+
+  async function markCustomerOrdersPaid(customerIdToPay: string) {
+    const group = unpaidByCustomer.find(
+      (item) => item.customerId === customerIdToPay
+    )
+
+    if (!group) return
+
+    const conferma = window.confirm(
+      `Vuoi segnare come pagati ${group.count} ordini di ${group.customerName} per un totale di € ${group.total.toLocaleString('it-IT', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}?`
+    )
+
+    if (!conferma) return
+
+    setMessage('')
+
+    const orderIds = group.orders.map((order) => order.id)
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ paid: true })
+      .in('id', orderIds)
+
+    if (error) {
+      console.error(error)
+      setMessage('Errore aggiornamento pagamenti ❌')
+      return
+    }
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        orderIds.includes(order.id) ? { ...order, paid: true } : order
+      )
+    )
+
+    setMessage('Ordini segnati come pagati ✅')
   }
 
   async function deleteOrder(orderId: string) {
@@ -1111,6 +1174,45 @@ function getFriendlyErrorMessage(error: any) {
         )}
 
         {message && <p className="text-sm">{message}</p>}
+      </div>
+
+      <div className="bg-white border rounded-2xl p-4 mb-4 space-y-4">
+        <h3 className="text-lg font-semibold">Debiti clienti</h3>
+
+        {unpaidByCustomer.length === 0 ? (
+          <p className="text-gray-600">Nessun cliente con ordini non pagati.</p>
+        ) : (
+          <div className="space-y-3">
+            {unpaidByCustomer.map((group) => (
+              <div
+                key={group.customerId}
+                className="border rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+              >
+                <div>
+                  <div className="font-semibold">{group.customerName}</div>
+                  <div className="text-sm text-gray-600">
+                    {group.count} ordini non pagati
+                  </div>
+                  <div className="text-lg font-bold">
+                    €{' '}
+                    {group.total.toLocaleString('it-IT', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => markCustomerOrdersPaid(group.customerId)}
+                  className="bg-green-600 text-white rounded px-4 py-2"
+                >
+                  Segna tutto pagato
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white border rounded-2xl p-4 mb-4 space-y-4">

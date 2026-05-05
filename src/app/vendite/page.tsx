@@ -1261,7 +1261,7 @@ function getFriendlyErrorMessage(error: any) {
           onClick={editingOrderId ? updateSale : saveSale}
           disabled={orderStatus === 'vendita' && hasAvailabilityErrors()}
           className={`w-full rounded p-2 text-white ${
-            hasAvailabilityErrors()
+            orderStatus === 'vendita' && hasAvailabilityErrors()
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-green-600 hover:bg-green-700'
           }`}

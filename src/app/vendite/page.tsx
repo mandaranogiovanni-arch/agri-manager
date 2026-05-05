@@ -648,7 +648,8 @@ function getFriendlyErrorMessage(error: any) {
 
           if (!product) continue
 
-          const available = availabilityMap[item.product_id || ''] ?? 0
+          const available =
+            (availabilityMap[item.product_id || ''] ?? 0) + Number(item.quantity || 0)
 
           if (Number(item.quantity) > available) {
             setMessage(

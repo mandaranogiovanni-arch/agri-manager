@@ -10,6 +10,7 @@ type Product = {
   unit: string
   base_price: number | null
   min_stock: number | null
+  daily_booking_limit: number | null
 }
 
 export default function ProdottiPage() {
@@ -24,6 +25,7 @@ export default function ProdottiPage() {
   const [unit, setUnit] = useState('kg')
   const [basePrice, setBasePrice] = useState('')
   const [minStock, setMinStock] = useState('')
+  const [dailyBookingLimit, setDailyBookingLimit] = useState('')
 
   useEffect(() => {
     loadProducts()
@@ -35,7 +37,7 @@ export default function ProdottiPage() {
 
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, category, unit, base_price, min_stock')
+      .select('id, name, category, unit, base_price, min_stock, daily_booking_limit')
       .order('name')
 
     if (error) {
@@ -55,6 +57,7 @@ export default function ProdottiPage() {
     setUnit('kg')
     setBasePrice('')
     setMinStock('')
+    setDailyBookingLimit('')
   }
 
   async function saveProduct() {
@@ -71,6 +74,7 @@ export default function ProdottiPage() {
       unit,
       base_price: basePrice ? Number(basePrice) : 0,
       min_stock: minStock ? Number(minStock) : 0,
+      daily_booking_limit: dailyBookingLimit ? Number(dailyBookingLimit) : 0,
     }
 
     if (editingProductId) {
@@ -111,6 +115,12 @@ export default function ProdottiPage() {
     setBasePrice(
       product.base_price !== null && product.base_price !== undefined
         ? String(product.base_price)
+        : ''
+    )
+
+    setDailyBookingLimit(
+      product.daily_booking_limit !== null && product.daily_booking_limit !== undefined
+        ? String(product.daily_booking_limit)
         : ''
     )
 
@@ -220,6 +230,20 @@ export default function ProdottiPage() {
           </div>
 
           <div>
+            <label className="block text-sm mb-1">
+              Disponibilità prenotabile giornaliera
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={dailyBookingLimit}
+              onChange={(e) => setDailyBookingLimit(e.target.value)}
+              placeholder="Es. 50"
+              className="w-full border rounded p-2"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm mb-1">Prezzo base (€)</label>
             <input
               type="number"
@@ -266,6 +290,10 @@ export default function ProdottiPage() {
 
                 <div>
                   Soglia minima: {Number(product.min_stock || 0)} {product.unit}
+                </div>
+
+                <div>
+                  Prenotabile al giorno: {Number(product.daily_booking_limit || 0)} {product.unit}
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-3">

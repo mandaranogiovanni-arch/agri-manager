@@ -15,6 +15,7 @@ type Product = {
   unit: string
   base_price?: number | null
   [key: string]: any
+  daily_booking_limit?: number | null
 }
 
 type OrderRow = {
@@ -157,7 +158,7 @@ export default function VenditePage() {
 
     const [customersRes, productsRes, ordersRes, itemsRes] = await Promise.all([
       supabase.from('customers').select('id, name').order('name'),
-      supabase.from('products').select('id, name, category, unit, base_price').order('name'),
+      supabase.from('products').select('id, name, category, unit, base_price, daily_booking_limit').order('name'),
       supabase
         .from('orders')
         .select(
@@ -506,6 +507,100 @@ function getFriendlyErrorMessage(error: any) {
   return `Errore: ${raw}`
 }
 
+  async function checkBookingLimitForLines() {
+    const validLines = lines.filter(
+      (line) =>
+        line.productId &&
+        Number(line.quantity) > 0 &&
+        Number(line.price) >= 0
+    )
+
+    for (const line of validLines) {
+      const product = products.find((p) => p.id === line.productId)
+
+      if (!product) {
+        setMessage('Prodotto non trovato')
+        return false
+      }
+
+      const dailyLimit = Number(product.daily_booking_limit || 0)
+
+      if (dailyLimit <= 0) {
+        setMessage(
+          `Non puoi prenotare ${product.name}: disponibilità prenotabile giornaliera non impostata`
+        )
+        return false
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_date', orderDate)
+        .eq('status', 'prenotazione')
+        .neq('fulfillment_status', 'annullato')
+
+      if (error) {
+        console.error(error)
+        setMessage('Errore controllo prenotazioni ❌')
+        return false
+      }
+
+      const bookingIds = (data || []).map((order) => order.id)
+
+      let alreadyBooked = 0
+
+      if (bookingIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('order_items')
+          .select('quantity, product_id')
+          .eq('product_id', line.productId)
+          .in('order_id', bookingIds)
+
+        if (itemsError) {
+          console.error(itemsError)
+          setMessage('Errore controllo quantità prenotate ❌')
+          return false
+        }
+
+        alreadyBooked = (itemsData || []).reduce(
+          (sum, item) => sum + Number(item.quantity || 0),
+          0
+        )
+      }
+
+      if (editingOrderId) {
+        const previousItems = orderItems.filter(
+          (item) =>
+            item.order_id === editingOrderId &&
+            item.product_id === line.productId
+        )
+
+        const previousQty = previousItems.reduce(
+          (sum, item) => sum + Number(item.quantity || 0),
+          0
+        )
+
+        alreadyBooked = Math.max(0, alreadyBooked - previousQty)
+      }
+
+      const requestedQty = Number(line.quantity || 0)
+      const remaining = dailyLimit - alreadyBooked
+
+      if (requestedQty > remaining) {
+        setMessage(
+          `Prenotazione non disponibile per ${product.name} il ${new Date(
+            orderDate
+          ).toLocaleDateString('it-IT')}. Prenotabile rimasto: ${remaining} ${
+            product.unit
+          }, richiesto: ${requestedQty} ${product.unit}`
+        )
+        return false
+      }
+    }
+
+    return true
+  }
+
   async function saveSale() {
     setMessage('')
 
@@ -514,6 +609,11 @@ function getFriendlyErrorMessage(error: any) {
     if (orderStatus === 'vendita') {
       const hasAvailability = await checkAvailabilityForLines()
       if (!hasAvailability) return
+    }
+
+    if (orderStatus === 'prenotazione') {
+      const hasBookingLimit = await checkBookingLimitForLines()
+      if (!hasBookingLimit) return
     }
 
     const validLines = lines.filter(
@@ -567,6 +667,11 @@ function getFriendlyErrorMessage(error: any) {
     if (orderStatus === 'vendita') {
       const hasAvailability = await checkAvailabilityForLines()
       if (!hasAvailability) return
+    }
+
+    if (orderStatus === 'prenotazione') {
+      const hasBookingLimit = await checkBookingLimitForLines()
+      if (!hasBookingLimit) return
     }
 
     const validLines = lines.filter(
@@ -1154,7 +1259,7 @@ function getFriendlyErrorMessage(error: any) {
         <button
           type="button"
           onClick={editingOrderId ? updateSale : saveSale}
-          disabled={hasAvailabilityErrors()}
+          disabled={orderStatus === 'vendita' && hasAvailabilityErrors()}
           className={`w-full rounded p-2 text-white ${
             hasAvailabilityErrors()
               ? 'bg-gray-400 cursor-not-allowed'
@@ -1168,7 +1273,7 @@ function getFriendlyErrorMessage(error: any) {
             : 'Salva vendita'}
         </button>
 
-        {hasAvailabilityErrors() && (
+        {orderStatus === 'vendita' && hasAvailabilityErrors() && (
           <p className="text-sm text-red-600 mt-2">
             Non puoi salvare: quantità superiore alla disponibilità.
           </p>

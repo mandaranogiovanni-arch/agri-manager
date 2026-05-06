@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: 'Agri Manager',
   description: 'Gestionale agricolo',
   manifest: '/manifest.json',
+}
+
+export const viewport = {
   themeColor: '#16a34a',
 }
 
@@ -49,6 +52,13 @@ export default function RootLayout({
                 className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 transition"
               >
                 Vendite
+              </Link>
+
+              <Link 
+                href="/calendario"
+                className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 transition"
+              >
+                Calendario
               </Link>
 
               <Link

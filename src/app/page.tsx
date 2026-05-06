@@ -26,6 +26,8 @@ type OrderRow = {
   order_date: string
   total: number
   paid: boolean
+  customer_id: string | null
+  status?: string | null
   fulfillment_status?: string | null
 }
 
@@ -48,6 +50,7 @@ type Harvest = {
 }
 
 type OrderItem = {
+  order_id: string
   product_id: string | null
   quantity: number
 }
@@ -70,6 +73,12 @@ type DashboardStats = {
   topSoldProduct: string
   topHarvestedProduct: string
   lowStockCount: number
+  unpaidDeliveredTotal: number
+}
+
+type StockAdjustment = {
+  product_id: string | null
+  quantity: number
 }
 
 type ChartPoint = {
@@ -98,7 +107,8 @@ export default function Home() {
     totalAvailableStock: 0,
     topSoldProduct: '-',
     topHarvestedProduct: '-',
-    lowStockCount: 0
+    lowStockCount: 0,
+    unpaidDeliveredTotal: 0,
   })
 
   useEffect(() => {
@@ -118,11 +128,11 @@ export default function Home() {
       adjustmentsRes,
     ] = await Promise.all([
       supabase.from('egg_production').select('production_date, quantity, broken'),
-      supabase.from('orders').select('id, order_date, total, paid, fulfillment_status'),
+      supabase.from('orders').select('id, order_date, total, customer_id, status, paid, fulfillment_status'),
       supabase.from('expenses').select('amount, expense_date'),
       supabase.from('products').select('id, name, category, unit, min_stock'),
       supabase.from('harvests').select('product_id, quantity'),
-      supabase.from('order_items').select('product_id, quantity'),
+      supabase.from('order_items').select('order_id, product_id, quantity'),
       supabase.from('stock_adjustments').select('product_id, quantity'),
     ])
 
@@ -138,16 +148,35 @@ export default function Home() {
     const expenseRows: ExpenseRow[] = expenseRes.data || []
     const products: Product[] = productRes.data || []
     const harvests: Harvest[] = harvestRes.data || []
-    const orderItems: OrderItem[] = itemRes.data || []
-    const adjustments: OrderItem[] = adjustmentsRes.data || []
+    const saleOrderIds = new Set(
+      orderRows
+        .filter((order) => (order.status || 'vendita') === 'vendita')
+        .map((order) => order.id)
+    )
+
+    const orderItems: OrderItem[] = (itemRes.data || []).filter((item) =>
+      saleOrderIds.has(item.order_id)
+    )
+    const adjustments: StockAdjustment[] = adjustmentsRes.data || []
 
     const todayEggRows = eggRows.filter((row) => row.production_date === today)
     const eggsToday = todayEggRows.reduce((sum, row) => sum + (row.quantity || 0), 0)
     const brokenToday = todayEggRows.reduce((sum, row) => sum + (row.broken || 0), 0)
 
-    const todayOrders = orderRows.filter((row) => row.order_date === today)
-    const totalRevenue = orderRows.reduce((sum, row) => sum + Number(row.total || 0), 0)
-    const revenueToday = todayOrders.reduce((sum, row) => sum + Number(row.total || 0), 0)
+    const revenueOrders = orderRows.filter(
+      (row) =>
+        (row.status || 'vendita') === 'vendita' ||
+        row.fulfillment_status === 'consegnato'
+    )
+
+    const totalRevenue = revenueOrders.reduce(
+      (sum, row) => sum + Number(row.total || 0),
+      0
+    )
+
+    const revenueToday = revenueOrders
+      .filter((row) => row.order_date === today)
+      .reduce((sum, row) => sum + Number(row.total || 0), 0)
 
     const todayExpensesRows = expenseRows.filter((row) => row.expense_date === today)
     const totalExpenses = expenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
@@ -229,6 +258,18 @@ export default function Home() {
       }
     })
 
+    const unpaidDeliveredTotal = orderRows
+      .filter(
+        (row) =>
+          !row.paid &&
+          (
+            (row.status || 'vendita') === 'vendita' ||
+            row.fulfillment_status === 'consegnato'
+          ) &&
+          row.fulfillment_status !== 'annullato'
+      )
+      .reduce((sum, row) => sum + Number(row.total || 0), 0)
+
     setChartData(chartRows)
 
     setStats({
@@ -246,6 +287,7 @@ export default function Home() {
       totalHarvested,
       availableProductsCount,
       totalAvailableStock,
+      unpaidDeliveredTotal,
       lowStockCount,
       topSoldProduct: topSold && topSold.sold > 0 ? topSold.name : '-',
       topHarvestedProduct:
@@ -290,6 +332,13 @@ export default function Home() {
           <Card title="Spese totali" value={`€ ${stats.totalExpenses.toFixed(2)}`} />
           <Card title="Spese oggi" value={`€ ${stats.expensesToday.toFixed(2)}`} />
           <Card title="Utile netto" value={`€ ${stats.netProfit.toFixed(2)}`} />
+          <Card
+            title="Da incassare"
+            value={`€ ${stats.unpaidDeliveredTotal.toLocaleString('it-IT', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`}
+          />
         </div>
       </section>
 
@@ -322,16 +371,18 @@ export default function Home() {
             <h3 className="font-semibold mb-4">Ricavi e spese</h3>
 
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="ricavi" name="Ricavi" />
-                  <Bar dataKey="spese" name="Spese" />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 && (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="ricavi" name="Ricavi" />
+                    <Bar dataKey="spese" name="Spese" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
@@ -339,15 +390,17 @@ export default function Home() {
             <h3 className="font-semibold mb-4">Uova buone prodotte</h3>
 
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="uova" name="Uova buone" strokeWidth={3} />
-                </LineChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 && (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="uova" name="Uova buone" strokeWidth={3} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -365,6 +418,11 @@ export default function Home() {
         <Link href="/vendite" className="bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md">
           <div className="text-xl font-semibold mb-2">Vendite 🛒</div>
           <div className="text-gray-600">Gestisci vendite e prenotazioni.</div>
+        </Link>
+
+        <Link href="/calendario" className="bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md">
+          <div className="text-xl font-semibold mb-2">Calendario 📅</div>
+          <div className="text-gray-600">Controlla prenotazioni giornaliere.</div>
         </Link>
 
         <Link href="/spese" className="bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md">

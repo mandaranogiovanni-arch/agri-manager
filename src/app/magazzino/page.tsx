@@ -17,6 +17,7 @@ type Harvest = {
 }
 
 type OrderItem = {
+  order_id: string
   product_id: string | null
   quantity: number
 }
@@ -61,10 +62,11 @@ export default function MagazzinoPage() {
     setLoading(true)
     setMessage('')
 
-    const [productsRes, harvestsRes, itemsRes, adjustmentsRes, eggsRes] = await Promise.all([
+    const [productsRes, harvestsRes, ordersRes, itemsRes, adjustmentsRes, eggsRes] = await Promise.all([
       supabase.from('products').select('id, name, category, unit, min_stock').order('name'),
       supabase.from('harvests').select('product_id, quantity'),
-      supabase.from('order_items').select('product_id, quantity'),
+      supabase.from('orders').select('id, status').eq('status', 'vendita'),
+      supabase.from('order_items').select('order_id, product_id, quantity'),
       supabase.from('stock_adjustments').select('product_id, quantity'),
       supabase.from('egg_production').select('quantity, broken'),
     ])
@@ -87,7 +89,13 @@ export default function MagazzinoPage() {
       console.error(itemsRes.error)
       setMessage('Errore caricamento vendite ❌')
     } else {
-      setOrderItems(itemsRes.data || [])
+      const saleOrderIds = new Set((ordersRes.data || []).map((order) => order.id))
+
+      const saleItems = (itemsRes.data || []).filter((item) =>
+        saleOrderIds.has(item.order_id)
+      )
+
+      setOrderItems(saleItems)
     }
 
     if (adjustmentsRes.error) {

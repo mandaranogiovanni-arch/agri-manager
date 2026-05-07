@@ -240,6 +240,28 @@ export default function CalendarioPage() {
                 0
               )
 
+              const totalLimits = products.reduce(
+                (sum, product) => sum + Number(product.daily_booking_limit || 0),
+                0
+              )
+
+              const totalBooked = itemsOfDay.reduce(
+                (sum, item) => sum + Number(item.quantity || 0),
+                0
+              )
+
+              let dayStatus = 'green'
+
+              if (totalLimits > 0) {
+                const percentage = (totalBooked / totalLimits) * 100
+
+                if (percentage >= 100) {
+                  dayStatus = 'red'
+                } else if (percentage >= 70) {
+                  dayStatus = 'orange'
+                }
+              }
+
               return (
                 <button
                   key={date}
@@ -248,8 +270,14 @@ export default function CalendarioPage() {
                     setSelectedDate(date)
                     setViewMode('giorno')
                   }}
-                  className={`text-left bg-white border rounded-2xl p-4 hover:shadow-md ${
-                    date === selectedDate ? 'border-green-600 ring-2 ring-green-200' : ''
+                  className={`text-left border rounded-2xl p-4 hover:shadow-md transition ${
+                    dayStatus === 'red'
+                      ? 'bg-red-50 border-red-500'
+                      : dayStatus === 'orange'
+                      ? 'bg-orange-50 border-orange-500'
+                      : 'bg-green-50 border-green-500'
+                  } ${
+                    date === selectedDate ? 'ring-2 ring-green-300' : ''
                   }`}
                 >
                   <div className="font-semibold">
@@ -266,6 +294,16 @@ export default function CalendarioPage() {
 
                   <div className="text-sm text-gray-600">
                     Prodotti: {itemsOfDay.length}
+                  </div>
+
+                  <div className="text-sm font-medium mt-2">
+                    Occupazione:{' '}
+                    {totalLimits > 0
+                      ? `${Math.min(
+                          999,
+                          Math.round((totalBooked / totalLimits) * 100)
+                        )}%`
+                      : '-'}
                   </div>
 
                   <div className="mt-2 font-semibold">

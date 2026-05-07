@@ -425,6 +425,11 @@ export default function Home() {
           <div className="text-gray-600">Controlla prenotazioni giornaliere.</div>
         </Link>
 
+        <Link href="/agenda" className="bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md">
+          <div className="text-xl font-semibold mb-2">Agenda 📋</div>
+          <div className="text-gray-600">Ordini e prodotti da preparare oggi.</div>
+        </Link>
+
         <Link href="/spese" className="bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md">
           <div className="text-xl font-semibold mb-2">Spese 💸</div>
           <div className="text-gray-600">Controlla i costi aziendali.</div>

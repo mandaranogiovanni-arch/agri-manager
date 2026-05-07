@@ -61,6 +61,13 @@ export default function RootLayout({
                 Calendario
               </Link>
 
+              <Link 
+                href="/agenda"
+                className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 transition"
+              >
+                Agenda
+              </Link>
+
               <Link
                 href="/spese"
                 className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 transition"

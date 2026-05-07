@@ -40,6 +40,7 @@ export default function CalendarioPage() {
     new Date().toISOString().split('T')[0]
   )
 
+  const [viewMode, setViewMode] = useState<'giorno' | 'settimana'>('giorno')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
@@ -136,6 +137,32 @@ export default function CalendarioPage() {
     0
   )
 
+  function getWeekDays(dateString: string) {
+    const date = new Date(dateString)
+    const day = date.getDay()
+    const diffToMonday = day === 0 ? -6 : 1 - day
+
+    const monday = new Date(date)
+    monday.setDate(date.getDate() + diffToMonday)
+
+    return Array.from({ length: 7 }).map((_, index) => {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + index)
+      return d.toISOString().split('T')[0]
+    })
+  }
+
+  const weekDays = getWeekDays(selectedDate)
+
+  function getOrdersForDate(date: string) {
+    return orders.filter((order) => order.order_date === date)
+  }
+
+  function getItemsForOrders(orderList: Order[]) {
+    const ids = new Set(orderList.map((order) => order.id))
+    return items.filter((item) => ids.has(item.order_id))
+  }
+
   return (
     <main className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Calendario prenotazioni 📅</h1>
@@ -152,6 +179,28 @@ export default function CalendarioPage() {
         <div className="mt-4 text-lg font-semibold">
           {new Date(selectedDate).toLocaleDateString('it-IT')}
         </div>
+      </div>
+
+      <div className="flex gap-2 mt-4">
+        <button
+          type="button"
+          onClick={() => setViewMode('giorno')}
+          className={`px-4 py-2 rounded border ${
+            viewMode === 'giorno' ? 'bg-green-600 text-white' : 'bg-white'
+          }`}
+        >
+          Giorno
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('settimana')}
+          className={`px-4 py-2 rounded border ${
+            viewMode === 'settimana' ? 'bg-green-600 text-white' : 'bg-white'
+          }`}
+        >
+          Settimana
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -177,8 +226,65 @@ export default function CalendarioPage() {
         </div>
       </div>
 
+      {viewMode === 'settimana' && (
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-3">Vista settimanale</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3">
+            {weekDays.map((date) => {
+              const ordersOfDay = getOrdersForDate(date)
+              const itemsOfDay = getItemsForOrders(ordersOfDay)
+
+              const totalDay = ordersOfDay.reduce(
+                (sum, order) => sum + Number(order.total || 0),
+                0
+              )
+
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(date)
+                    setViewMode('giorno')
+                  }}
+                  className={`text-left bg-white border rounded-2xl p-4 hover:shadow-md ${
+                    date === selectedDate ? 'border-green-600 ring-2 ring-green-200' : ''
+                  }`}
+                >
+                  <div className="font-semibold">
+                    {new Date(date).toLocaleDateString('it-IT', {
+                      weekday: 'short',
+                      day: '2-digit',
+                      month: '2-digit',
+                    })}
+                  </div>
+
+                  <div className="mt-2 text-sm text-gray-600">
+                    Prenotazioni: {ordersOfDay.length}
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    Prodotti: {itemsOfDay.length}
+                  </div>
+
+                  <div className="mt-2 font-semibold">
+                    €{' '}
+                    {totalDay.toLocaleString('it-IT', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {viewMode === 'giorno' && (
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-3">Riepilogo prodotti</h2>
+        <h2 className="text-xl font-semibold mb-3">Riepilogo prodotti</h2>  
 
         {productSummary.length === 0 ? (
           <p>Nessun prodotto prenotato per questo giorno.</p>
@@ -219,7 +325,9 @@ export default function CalendarioPage() {
           </div>
         )}
       </section>
+      )}
 
+      {viewMode === 'giorno' && (
       <section>
         <h2 className="text-xl font-semibold mb-3">Prenotazioni del giorno</h2>
 
@@ -280,6 +388,7 @@ export default function CalendarioPage() {
           </div>
         )}
       </section>
+      )}
 
       {message && <p className="text-sm mt-4">{message}</p>}
     </main>

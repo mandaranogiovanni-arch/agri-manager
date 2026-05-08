@@ -150,7 +150,11 @@ export default function Home() {
     const harvests: Harvest[] = harvestRes.data || []
     const saleOrderIds = new Set(
       orderRows
-        .filter((order) => (order.status || 'vendita') === 'vendita')
+        .filter(
+          (order) =>
+            (order.status || 'vendita') === 'vendita' ||
+            order.fulfillment_status === 'consegnato'
+        )
         .map((order) => order.id)
     )
 

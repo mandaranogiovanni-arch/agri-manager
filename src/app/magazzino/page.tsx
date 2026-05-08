@@ -65,7 +65,9 @@ export default function MagazzinoPage() {
     const [productsRes, harvestsRes, ordersRes, itemsRes, adjustmentsRes, eggsRes] = await Promise.all([
       supabase.from('products').select('id, name, category, unit, min_stock').order('name'),
       supabase.from('harvests').select('product_id, quantity'),
-      supabase.from('orders').select('id, status').eq('status', 'vendita'),
+      supabase
+        .from('orders')
+        .select('id, status, fulfillment_status'),
       supabase.from('order_items').select('order_id, product_id, quantity'),
       supabase.from('stock_adjustments').select('product_id, quantity'),
       supabase.from('egg_production').select('quantity, broken'),
@@ -89,7 +91,15 @@ export default function MagazzinoPage() {
       console.error(itemsRes.error)
       setMessage('Errore caricamento vendite ❌')
     } else {
-      const saleOrderIds = new Set((ordersRes.data || []).map((order) => order.id))
+      const saleOrderIds = new Set(
+        (ordersRes.data || [])
+          .filter(
+            (order) =>
+              (order.status || 'vendita') === 'vendita' ||
+              order.fulfillment_status === 'consegnato'
+          )
+          .map((order) => order.id)
+      )
 
       const saleItems = (itemsRes.data || []).filter((item) =>
         saleOrderIds.has(item.order_id)

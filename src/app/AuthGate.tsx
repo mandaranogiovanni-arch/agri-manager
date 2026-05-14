@@ -64,6 +64,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return <div className="p-6">Caricamento...</div>
   }
 
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname
+
+    if (path.startsWith('/shop')) {
+      return <>{children}</>
+    }
+  }
+
   if (!userEmail) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">

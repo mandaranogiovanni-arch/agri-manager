@@ -54,8 +54,24 @@ export default function ShopPage() {
   const [whatsappText, setWhatsappText] = useState('')
   const [showWhatsappButton, setShowWhatsappButton] = useState(false)
 
+  const [shopUserEmail, setShopUserEmail] = useState<string | null>(null)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+
   useEffect(() => {
-    loadAll()
+    supabase.auth.getSession().then(({ data }) => {
+      setShopUserEmail(data.session?.user.email || null)
+      loadAll()
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setShopUserEmail(session?.user.email || null)
+    })
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   async function loadAll() {
@@ -274,13 +290,121 @@ export default function ShopPage() {
     loadAll()
   }
 
+  async function shopLogin() {
+    setMessage('')
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: authPassword,
+    })
+
+    if (error) {
+      setMessage('Email o password non corretti')
+      return
+    }
+  }
+
+  async function shopRegister() {
+    setMessage('')
+
+    const { error } = await supabase.auth.signUp({
+      email: authEmail,
+      password: authPassword,
+    })
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setMessage('Account creato. Ora puoi accedere.')
+    setAuthMode('login')
+  }
+
+  async function shopLogout() {
+    await supabase.auth.signOut()
+  }
+
+  if (!shopUserEmail) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white border rounded-2xl p-6 max-w-sm w-full space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <img src="/icon-192.png" alt="Agri Shop" className="w-12 h-12 rounded-2xl" />
+            <div>
+              <h1 className="text-2xl font-bold">Agri Shop</h1>
+              <p className="text-gray-600 text-sm">Accedi per ordinare</p>
+            </div>
+          </div>
+
+          <input
+            type="email"
+            placeholder="Email"
+            value={authEmail}
+            onChange={(e) => setAuthEmail(e.target.value)}
+            className="w-full border rounded p-2"
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={authPassword}
+            onChange={(e) => setAuthPassword(e.target.value)}
+            className="w-full border rounded p-2"
+          />
+
+          <button
+            type="button"
+            onClick={authMode === 'login' ? shopLogin : shopRegister}
+            className="w-full bg-green-600 text-white rounded p-2"
+          >
+            {authMode === 'login' ? 'Accedi' : 'Crea account'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+            className="w-full border rounded p-2 bg-white"
+          >
+            {authMode === 'login'
+              ? 'Non hai un account? Registrati'
+              : 'Hai già un account? Accedi'}
+          </button>
+
+          {message && <p className="text-sm text-red-600">{message}</p>}
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Ordina prodotti agricoli 🧺</h1>
-        <p className="text-gray-600 mb-6">
-          Scegli il giorno e prenota i prodotti disponibili.
-        </p>
+        <div className="flex items-center gap-3 mb-4">
+          <img
+            src="/icon-192.png"
+            alt="Agri Shop"
+            className="w-14 h-14 rounded-2xl"
+          />
+          <div>
+            <h1 className="text-3xl font-bold">Agri Shop</h1>
+            <p className="text-gray-600">Ordina prodotti agricoli freschi</p>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center mb-4">
+          <div className="text-sm text-gray-600">
+            Accesso: {shopUserEmail}
+          </div>
+
+          <button
+            type="button"
+            onClick={shopLogout}
+            className="text-sm text-red-600"
+          >
+            Esci
+          </button>
+        </div>
 
         <div className="bg-white border rounded-2xl p-4 mb-6">
           <label className="block text-sm mb-1">Giorno ritiro / consegna</label>

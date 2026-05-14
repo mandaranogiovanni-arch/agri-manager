@@ -11,6 +11,7 @@ type Product = {
   base_price: number | null
   min_stock: number | null
   daily_booking_limit: number | null
+  visible_in_shop: boolean | null
 }
 
 export default function ProdottiPage() {
@@ -26,6 +27,7 @@ export default function ProdottiPage() {
   const [basePrice, setBasePrice] = useState('')
   const [minStock, setMinStock] = useState('')
   const [dailyBookingLimit, setDailyBookingLimit] = useState('')
+  const [visibleInShop, setVisibleInShop] = useState(false)
 
   useEffect(() => {
     loadProducts()
@@ -37,7 +39,7 @@ export default function ProdottiPage() {
 
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, category, unit, base_price, min_stock, daily_booking_limit')
+      .select('id, name, category, unit, base_price, min_stock, daily_booking_limit, visible_in_shop')
       .order('name')
 
     if (error) {
@@ -58,6 +60,7 @@ export default function ProdottiPage() {
     setBasePrice('')
     setMinStock('')
     setDailyBookingLimit('')
+    setVisibleInShop(false)
   }
 
   async function saveProduct() {
@@ -75,6 +78,7 @@ export default function ProdottiPage() {
       base_price: basePrice ? Number(basePrice) : 0,
       min_stock: minStock ? Number(minStock) : 0,
       daily_booking_limit: dailyBookingLimit ? Number(dailyBookingLimit) : 0,
+      visible_in_shop: visibleInShop,
     }
 
     if (editingProductId) {
@@ -111,6 +115,7 @@ export default function ProdottiPage() {
     setName(product.name)
     setCategory(product.category)
     setUnit(product.unit)
+    setVisibleInShop(Boolean(product.visible_in_shop))
 
     setBasePrice(
       product.base_price !== null && product.base_price !== undefined
@@ -243,6 +248,15 @@ export default function ProdottiPage() {
             />
           </div>
 
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={visibleInShop}
+              onChange={(e) => setVisibleInShop(e.target.checked)}
+            />
+            Visibile nello shop cliente
+          </label>
+
           <div>
             <label className="block text-sm mb-1">Prezzo base (€)</label>
             <input
@@ -280,6 +294,9 @@ export default function ProdottiPage() {
                 <div className="font-semibold text-lg">{product.name}</div>
                 <div>Categoria: {product.category}</div>
                 <div>Unità: {product.unit}</div>
+                <div>
+                  Shop cliente: {product.visible_in_shop ? 'Visibile' : 'Nascosto'}
+                </div>
                 <div>
                   Prezzo base: €{' '}
                   {Number(product.base_price || 0).toLocaleString('it-IT', {

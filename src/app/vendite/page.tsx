@@ -28,6 +28,7 @@ type OrderRow = {
   pickup_time?: string | null
   notes?: string | null
   fulfillment_status?: string | null
+  public_order_number?: number | null
 }
 
 type OrderItemRow = {
@@ -162,7 +163,7 @@ export default function VenditePage() {
       supabase
         .from('orders')
         .select(
-          'id, order_date, total, paid, customer_id, status, pickup_time, notes, fulfillment_status'
+          'id, public_order_number, order_date, total, paid, customer_id, status, pickup_time, notes, fulfillment_status'
         )
         .order('order_date', { ascending: false })
         .order('created_at', { ascending: false }),
@@ -569,18 +570,25 @@ function getFriendlyErrorMessage(error: any) {
       }
 
       if (editingOrderId) {
-        const previousItems = orderItems.filter(
-          (item) =>
-            item.order_id === editingOrderId &&
-            item.product_id === line.productId
-        )
+        const editingOrder = orders.find((order) => order.id === editingOrderId)
 
-        const previousQty = previousItems.reduce(
-          (sum, item) => sum + Number(item.quantity || 0),
-          0
-        )
+        const isSameDate =
+          editingOrder && editingOrder.order_date === orderDate
 
-        alreadyBooked = Math.max(0, alreadyBooked - previousQty)
+        if (isSameDate) {
+          const previousItems = orderItems.filter(
+            (item) =>
+              item.order_id === editingOrderId &&
+              item.product_id === line.productId
+          )
+
+          const previousQty = previousItems.reduce(
+            (sum, item) => sum + Number(item.quantity || 0),
+            0
+          )
+
+          alreadyBooked = Math.max(0, alreadyBooked - previousQty)
+        }
       }
 
       const requestedQty = Number(line.quantity || 0)
@@ -920,6 +928,91 @@ function getFriendlyErrorMessage(error: any) {
   }
 
   const saveDisabled = hasAvailabilityErrors()
+
+  function printReceipt(order: OrderRow) {
+    const orderItems = getItemsForOrder(order.id)
+
+    const receiptHtml = `
+      <html>
+        <head>
+          <title>Ricevuta ordine</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h1 { margin-bottom: 4px; }
+            .small { color: #555; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; }
+            .total { margin-top: 20px; font-size: 20px; font-weight: bold; text-align: right; }
+            .status { margin-top: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>Ricevuta ordine</h1>
+
+          <div class="small">
+            ${order.public_order_number ? `Ordine #${order.public_order_number}<br />` : ''}
+            Data: ${new Date(order.order_date).toLocaleDateString('it-IT')}<br />
+            Cliente: ${getCustomerName(order.customer_id)}<br />
+            Tipo: ${getStatusLabel(order.status)}<br />
+            Stato: ${getFulfillmentLabel(order.fulfillment_status)}<br />
+            Pagamento: ${order.paid ? 'Pagato' : 'Non pagato'}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Prodotto</th>
+                <th>Quantità</th>
+                <th>Prezzo</th>
+                <th>Totale</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${orderItems
+                .map(
+                  (item) => `
+                    <tr>
+                      <td>${getProductName(item.product_id)}</td>
+                      <td>${item.quantity} ${getProductUnit(item.product_id)}</td>
+                      <td>€ ${Number(item.price).toLocaleString('it-IT', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}</td>
+                      <td>€ ${Number(item.quantity * item.price).toLocaleString('it-IT', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}</td>
+                    </tr>
+                  `
+                )
+                .join('')}
+            </tbody>
+          </table>
+
+          <div class="total">
+            Totale: € ${Number(order.total || 0).toLocaleString('it-IT', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </div>
+
+          ${order.notes ? `<div class="status">Note: ${order.notes}</div>` : ''}
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank')
+
+    if (!printWindow) {
+      setMessage('Popup bloccato: abilita le finestre popup per stampare')
+      return
+    }
+
+    printWindow.document.write(receiptHtml)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
 
   return (
     <main className="p-6 max-w-5xl mx-auto">
@@ -1422,6 +1515,13 @@ function getFriendlyErrorMessage(error: any) {
 
               return (
                 <div key={order.id} className="bg-white border rounded-2xl p-4">
+                   
+                   {order.public_order_number && (
+                     <div className="font-semibold text-green-700">
+                       Ordine #{order.public_order_number}
+                     </div>
+                   )}
+                   
                   <div className="font-semibold mb-2">
                     Data: {new Date(order.order_date).toLocaleDateString('it-IT')}
                   </div>
@@ -1512,6 +1612,14 @@ function getFriendlyErrorMessage(error: any) {
                       className="bg-blue-600 text-white rounded px-4 py-2"
                     >
                       Modifica ordine
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => printReceipt(order)}
+                      className="bg-gray-700 text-white rounded px-4 py-2"
+                    >
+                      Stampa ricevuta
                     </button>
 
                     <button

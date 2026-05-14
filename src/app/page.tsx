@@ -179,8 +179,8 @@ export default function Home() {
 
     const revenueOrders = orderRows.filter(
       (row) =>
-        (row.status || 'vendita') === 'vendita' ||
-        row.fulfillment_status === 'consegnato'
+        row.paid &&
+        row.fulfillment_status !== 'annullato'
     )
 
     const totalRevenue = revenueOrders.reduce(

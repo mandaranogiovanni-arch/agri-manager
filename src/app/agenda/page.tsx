@@ -25,6 +25,7 @@ type Order = {
   fulfillment_status: string | null
   pickup_time: string | null
   notes: string | null
+  public_order_number?: number | null
 }
 
 type OrderItem = {
@@ -61,7 +62,7 @@ export default function AgendaPage() {
       supabase
         .from('orders')
         .select(
-          'id, order_date, customer_id, total, paid, status, fulfillment_status, pickup_time, notes'
+          'id, public_order_number, order_date, customer_id, total, paid, status, fulfillment_status, pickup_time, notes'
         )
         .neq('fulfillment_status', 'annullato')
         .order('pickup_time', { ascending: true }),
@@ -234,6 +235,13 @@ export default function AgendaPage() {
 
               return (
                 <div key={order.id} className="bg-white border rounded-2xl p-4">
+
+                  {order.public_order_number && (
+                    <div className="font-semibold text-green-700">
+                      Ordine #{order.public_order_number}
+                    </div>
+                  )}
+                  
                   <div className="font-semibold text-lg">
                     {order.pickup_time ? `${order.pickup_time} - ` : ''}
                     {getCustomerName(order.customer_id)}

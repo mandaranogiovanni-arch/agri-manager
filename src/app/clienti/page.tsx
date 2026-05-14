@@ -23,6 +23,13 @@ type Order = {
   notes?: string | null
 }
 
+type EggOrderBatch = {
+  order_id: string
+  order_item_id: string
+  batch_number: string | null
+  quantity: number
+}
+
 export default function ClientiPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [orders, setOrders] = useState<Order[]>([])
@@ -38,6 +45,8 @@ export default function ClientiPage() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
+  const [eggBatches, setEggBatches] = useState<EggOrderBatch[]>([])
+
   useEffect(() => {
     loadAll()
   }, [])
@@ -46,12 +55,15 @@ export default function ClientiPage() {
     setLoading(true)
     setMessage('')
 
-    const [customersRes, ordersRes] = await Promise.all([
+    const [customersRes, ordersRes, batchesRes] = await Promise.all([
       supabase.from('customers').select('*').order('name'),
       supabase
         .from('orders')
         .select('id, customer_id, order_date, total, paid, status, fulfillment_status, pickup_time, notes')
         .order('order_date', { ascending: false }),
+      supabase
+        .from('egg_order_batches')
+        .select('order_id, order_item_id, batch_number, quantity'),
     ])
 
     if (customersRes.error) {
@@ -66,6 +78,12 @@ export default function ClientiPage() {
       setMessage('Errore caricamento ordini clienti ❌')
     } else {
       setOrders(ordersRes.data || [])
+    }
+
+    if (batchesRes.error) {
+      console.error(batchesRes.error)
+    } else {
+      setEggBatches(batchesRes.data || [])
     }
 
     setLoading(false)
@@ -412,6 +430,19 @@ export default function ClientiPage() {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
+                      {eggBatches.filter((batch) => batch.order_id === order.id).length > 0 && (
+                        <div className="mt-3 border rounded-lg p-3 bg-yellow-50">
+                          <div className="font-semibold mb-1">Lotti uova consegnati</div>
+
+                          {eggBatches
+                            .filter((batch) => batch.order_id === order.id)
+                            .map((batch) => (
+                              <div key={`${batch.order_item_id}-${batch.batch_number}`}>
+                                Lotto: {batch.batch_number || '-'} — Quantità: {batch.quantity}
+                              </div>
+                            ))}
+                       </div>
+                      )}
                     </div>
                   </div>
                 ))

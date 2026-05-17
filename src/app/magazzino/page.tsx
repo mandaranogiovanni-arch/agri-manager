@@ -73,6 +73,9 @@ export default function MagazzinoPage() {
       supabase.from('egg_production').select('quantity, broken'),
     ])
 
+    console.log('ITEMS RES', itemsRes.data)
+    console.log('ITEMS ERROR', itemsRes.error)
+
     if (productsRes.error) {
       console.error(productsRes.error)
       setMessage('Errore caricamento prodotti ❌')
@@ -95,12 +98,14 @@ export default function MagazzinoPage() {
         (ordersRes.data || [])
           .filter(
             (order) =>
-              (order.status || 'vendita') === 'vendita' ||
-              order.fulfillment_status === 'consegnato'
+              order.status === 'vendita' ||
+              (
+                order.status === 'prenotazione' &&
+                order.fulfillment_status === 'consegnato'
+              )
           )
           .map((order) => order.id)
       )
-
       const saleItems = (itemsRes.data || []).filter((item) =>
         saleOrderIds.has(item.order_id)
       )
@@ -138,6 +143,12 @@ export default function MagazzinoPage() {
           : harvests
               .filter((h) => h.product_id === product.id)
               .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
+
+      console.log({
+        product: product.name,
+        productId: product.id,
+        soldItems: orderItems.filter((item) => item.product_id === product.id),
+      })
 
       const sold = orderItems
         .filter((item) => item.product_id === product.id)

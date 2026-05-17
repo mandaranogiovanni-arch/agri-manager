@@ -225,13 +225,10 @@ export default function ShopPage() {
       }
     })
 
-    const { data: orderId, error } = await supabase.rpc('create_order_with_items', {
+    const { data: orderId, error } = await supabase.rpc('create_shop_order', {
+      p_customer_name: customerName.trim(),
+      p_customer_phone: customerPhone.trim() || null,
       p_order_date: selectedDate,
-      p_total: total,
-      p_paid: false,
-      p_customer_id: customerId,
-      p_status: 'prenotazione',
-      p_fulfillment_status: 'da_evadere',
       p_pickup_time: pickupTime || null,
       p_notes: notes.trim() || 'Ordine da shop cliente',
       p_items: payloadItems,

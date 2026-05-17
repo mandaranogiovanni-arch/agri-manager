@@ -162,15 +162,22 @@ export default function Home() {
       orderRows
         .filter(
           (order) =>
-            (order.status || 'vendita') === 'vendita' ||
-            order.fulfillment_status === 'consegnato'
+            order.status === 'vendita' ||
+            (
+              order.status === 'prenotazione' &&
+              order.fulfillment_status === 'consegnato'
+            )
         )
         .map((order) => order.id)
     )
 
-    const orderItems: OrderItem[] = (itemRes.data || []).filter((item) =>
+    const orderItems = (itemRes.data || []).filter((item) =>
       saleOrderIds.has(item.order_id)
     )
+
+    console.log('SALE ORDER IDS:', saleOrderIds)
+    console.log('ORDER ITEMS:', orderItems)
+
     const adjustments: StockAdjustment[] = adjustmentsRes.data || []
 
     const todayEggRows = eggRows.filter((row) => row.production_date === today)
@@ -227,6 +234,14 @@ export default function Home() {
       const adjusted = adjustments
         .filter((a) => a.product_id === product.id)
         .reduce((sum, a) => sum + Number(a.quantity || 0), 0)
+
+        console.log({
+          product: product.name,
+          harvested,
+          sold,
+          adjusted,
+          available: harvested - sold - adjusted,
+        })
 
       return {
         ...product,

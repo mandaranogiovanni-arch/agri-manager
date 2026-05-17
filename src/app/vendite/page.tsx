@@ -109,36 +109,72 @@ export default function VenditePage() {
   }, [products])
 
   async function loadAvailability() {
-    const [harvestsRes, itemsRes, adjustmentsRes, eggsRes] = await Promise.all([
-      supabase.from('harvests').select('product_id, quantity'),
-      supabase.from('order_items').select('product_id, quantity'),
-      supabase.from('stock_adjustments').select('product_id, quantity'),
-      supabase.from('egg_production').select('quantity, broken'),
-    ])
+    const [harvestsRes, ordersRes, itemsRes, adjustmentsRes, eggsRes] =
+      await Promise.all([
+        supabase.from('harvests').select('product_id, quantity'),
+        supabase.from('orders').select('id, status, fulfillment_status'),
+        supabase.from('order_items').select('order_id, product_id, quantity'),
+        supabase.from('stock_adjustments').select('product_id, quantity'),
+        supabase.from('egg_production').select('quantity, broken'),
+      ])
 
-    if (harvestsRes.error || itemsRes.error || adjustmentsRes.error || eggsRes.error) {
-      console.error(harvestsRes.error || itemsRes.error || adjustmentsRes.error || eggsRes.error)
+    if (
+      harvestsRes.error ||
+      ordersRes.error ||
+      itemsRes.error ||
+      adjustmentsRes.error ||
+      eggsRes.error
+    ) {
+      console.error(
+        harvestsRes.error ||
+          ordersRes.error ||
+          itemsRes.error ||
+          adjustmentsRes.error ||
+          eggsRes.error
+      )
       return
     }
 
     const harvests = harvestsRes.data || []
+    const orders = ordersRes.data || []
     const orderItemsAll = itemsRes.data || []
     const adjustments = adjustmentsRes.data || []
     const eggs = eggsRes.data || []
 
+    const saleOrderIds = new Set(
+      orders
+        .filter(
+          (order) =>
+            order.status === 'vendita' ||
+            (
+              order.status === 'prenotazione' &&
+              order.fulfillment_status === 'consegnato'
+            )
+        )
+        .map((order) => order.id)
+    )
+
+    const validSoldItems = orderItemsAll.filter((item) =>
+      saleOrderIds.has(item.order_id)
+    )
+
     const eggsAvailable = eggs.reduce(
-      (sum, row) => sum + Number(row.quantity || 0) - Number(row.broken || 0),
+      (sum, row) =>
+        sum + Number(row.quantity || 0) - Number(row.broken || 0),
       0
     )
 
     const map: Record<string, number> = {}
 
     for (const product of products) {
-      const harvested = harvests
-        .filter((h) => h.product_id === product.id)
-        .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
+      const harvested =
+        product.category === 'uova'
+          ? eggsAvailable
+          : harvests
+              .filter((h) => h.product_id === product.id)
+              .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
 
-      const sold = orderItemsAll
+      const sold = validSoldItems
         .filter((item) => item.product_id === product.id)
         .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
 
@@ -146,8 +182,7 @@ export default function VenditePage() {
         .filter((adj) => adj.product_id === product.id)
         .reduce((sum, adj) => sum + Number(adj.quantity || 0), 0)
 
-      map[product.id] =
-        (product.category === 'uova' ? eggsAvailable : harvested) - sold - adjusted
+      map[product.id] = harvested - sold - adjusted
     }
 
     setAvailabilityMap(map)
@@ -173,6 +208,11 @@ export default function VenditePage() {
     if (customersRes.error) console.error(customersRes.error)
     if (productsRes.error) console.error(productsRes.error)
     if (ordersRes.error) console.error(ordersRes.error)
+      console.log('ORDERS DATA:', ordersRes.data)
+      console.log(
+        'ORDER 18:',
+        (ordersRes.data || []).find((order) => String(order.public_order_number) === '18')
+      )
     if (itemsRes.error) console.error(itemsRes.error)
 
     setCustomers(customersRes.data || [])
@@ -384,85 +424,46 @@ function hasAvailabilityErrors() {
   }
 
   async function checkAvailabilityForLines() {
-  const validLines = lines.filter(
-    (line) =>
-      line.productId &&
-      Number(line.quantity) > 0 &&
-      Number(line.price) > 0
-  )
+    const validLines = lines.filter(
+      (line) =>
+        line.productId &&
+        Number(line.quantity) > 0 &&
+        Number(line.price) > 0
+    )
 
-  const [harvestsRes, itemsRes, adjustmentsRes, eggsRes] = await Promise.all([
-    supabase.from('harvests').select('product_id, quantity'),
-    supabase.from('order_items').select('order_id, product_id, quantity'),
-    supabase.from('stock_adjustments').select('product_id, quantity'),
-    supabase.from('egg_production').select('quantity, broken'),
-  ])
+    for (const line of validLines) {
+      const product = products.find((p) => p.id === line.productId)
 
-  if (harvestsRes.error || itemsRes.error || adjustmentsRes.error || eggsRes.error) {
-    console.error(harvestsRes.error || itemsRes.error || adjustmentsRes.error || eggsRes.error)
-    setMessage('Errore controllo disponibilità ❌')
-    return false
-  }
+      if (!product) {
+        setMessage('Prodotto non trovato')
+        return false
+      }
 
-  const harvests = harvestsRes.data || []
-  const orderItemsAll = itemsRes.data || []
-  const adjustments: StockAdjustmentRow[] = adjustmentsRes.data || []
-  const eggs: EggProductionRow[] = eggsRes.data || []
+      const requestedQty = Number(line.quantity || 0)
 
-  const currentOrderItems = editingOrderId
-    ? orderItemsAll.filter((item) => item.order_id === editingOrderId)
-    : []
-
-  for (const line of validLines) {
-    const product = products.find((p) => p.id === line.productId)
-
-    if (!product) {
-      setMessage('Prodotto non trovato')
-      return false
-    }
-
-    const requestedQty = Number(line.quantity || 0)
-
-    const harvested = harvests
-      .filter((h) => h.product_id === line.productId)
-      .reduce((sum, h) => sum + Number(h.quantity || 0), 0)
-
-    const sold = orderItemsAll
-      .filter((item) => item.product_id === line.productId)
-      .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-
-    const adjusted = adjustments
-      .filter((adj) => adj.product_id === line.productId)
-      .reduce((sum, adj) => sum + Number(adj.quantity || 0), 0)
-
-    const eggsAvailable =
-      product.category === 'uova'
-        ? eggs.reduce(
-            (sum, row) => sum + Number(row.quantity || 0) - Number(row.broken || 0),
-            0
-          )
+      const currentOrderQtyForThisProduct = editingOrderId
+        ? orderItems
+            .filter(
+              (item) =>
+                item.order_id === editingOrderId &&
+                item.product_id === line.productId
+            )
+            .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
         : 0
 
-    const currentOrderQtyForThisProduct = currentOrderItems
-      .filter((item) => item.product_id === line.productId)
-      .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+      const available =
+        (availabilityMap[line.productId] ?? 0) + currentOrderQtyForThisProduct
 
-    const available =
-      (product.category === 'uova' ? eggsAvailable : harvested) -
-      sold -
-      adjusted +
-      currentOrderQtyForThisProduct
-
-    if (requestedQty > available) {
-      setMessage(
-        `Disponibilità insufficiente per ${product.name}. Disponibile: ${available} ${product.unit}, richiesto: ${requestedQty} ${product.unit}`
-      )
-      return false
+      if (requestedQty > available) {
+        setMessage(
+          `Disponibilità insufficiente per ${product.name}. Disponibile: ${available} ${product.unit}, richiesto: ${requestedQty} ${product.unit}`
+        )
+        return false
+      }
     }
-  }
 
-  return true
-}
+    return true
+  }
 
 function getFriendlyErrorMessage(error: any) {
   const raw = error?.message || error?.details || ''

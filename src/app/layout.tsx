@@ -6,7 +6,7 @@ import AppShell from './AppShell'
 export const metadata: Metadata = {
   title: 'Agri Manager',
   description: 'Gestionale agricolo',
-  manifest: '/manifest.json',
+  manifest: '/manifest-manager.json',
 }
 
 export const viewport = {
@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="it">
       <head>
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/manifest-manager.json" />
         <meta name="theme-color" content="#16a34a" />
       </head>
       <body className="bg-gray-50 text-gray-900">

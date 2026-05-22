@@ -407,8 +407,16 @@ export default function Home() {
                     <XAxis dataKey="date" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="ricavi" name="Ricavi" />
-                    <Bar dataKey="spese" name="Spese" />
+                    <Bar 
+                      dataKey="ricavi" 
+                      name="Ricavi" 
+                      fill="#16a34a"
+                    />
+                    <Bar 
+                      dataKey="spese" 
+                      name="Spese"
+                      fill="#2563eb" 
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
